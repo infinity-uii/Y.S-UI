@@ -51,7 +51,7 @@ class MCPClient:
                 # normalize
                 items = []
                 if isinstance(data, dict):
-                    # maybe {"tools": [...]}
+                    # maybe {"tools": [...]} 
                     if "tools" in data and isinstance(data["tools"], list):
                         items = data["tools"]
                     elif "items" in data and isinstance(data["items"], list):
@@ -169,8 +169,27 @@ class ToolRegistry:
         t = self._tools.get(name)
         if t:
             t.enabled = bool(enabled)
+            # persist if DB available
+            try:
+                from db.repos import SettingsRepo
+                sr = SettingsRepo()
+                sr.set(f"tool:{name}:enabled", "1" if enabled else "0")
+            except Exception:
+                pass
             return True
         return False
+
+    def load_persisted_states(self):
+        try:
+            from db.repos import SettingsRepo
+            sr = SettingsRepo()
+            for name, t in list(self._tools.items()):
+                val = sr.get(f"tool:{name}:enabled")
+                if val is not None:
+                    t.enabled = val == "1"
+        except Exception:
+            # DB not ready or settings not available
+            return
 
     def auto_discover(self, servers: List[str]):
         for s in servers:
