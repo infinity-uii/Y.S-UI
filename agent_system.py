@@ -51,8 +51,9 @@ from werkzeug.utils import secure_filename
 # ---------------------------------------------------------------------------
 HOST = "0.0.0.0"
 PORT = int(os.environ.get("PORT", "8080"))
-YS_USER = os.environ.get("YS_USER", "")
-YS_PASSWORD = os.environ.get("YS_PASSWORD", "")
+# YS_USER / YS_PASSWORD are intentionally NOT cached at module load time.
+# They are read from os.environ on every request so that secrets set after
+# process start (e.g. via Replit Secrets) are picked up without a restart.
 SECRET_KEY = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 
@@ -1303,9 +1304,11 @@ def login():
     if request.method == "POST":
         username = (request.form.get("username") or "").strip()
         password = (request.form.get("password") or "").strip()
-        if not YS_USER or not YS_PASSWORD:
+        _ys_user = os.environ.get("YS_USER", "")
+        _ys_password = os.environ.get("YS_PASSWORD", "")
+        if not _ys_user or not _ys_password:
             error = "Server not configured (YS_USER / YS_PASSWORD missing)."
-        elif username == YS_USER and password == YS_PASSWORD:
+        elif username == _ys_user and password == _ys_password:
             session.clear()
             session["logged_in"] = True
             session["user_id"] = uuid.uuid4().hex
@@ -1995,7 +1998,11 @@ if __name__ == "__main__":
     log.info("Ollama base: %s", OLLAMA_BASE)
     log.info("Workspace: %s", WORKSPACE_DIR)
 
-    if not YS_USER or not YS_PASSWORD:
+    _ys_user_check = os.environ.get("YS_USER", "")
+    _ys_pass_check = os.environ.get("YS_PASSWORD", "")
+    log.info("YS_USER: %s", "loaded" if _ys_user_check else "NOT SET — login will fail")
+    log.info("YS_PASSWORD: %s", "loaded" if _ys_pass_check else "NOT SET — login will fail")
+    if not _ys_user_check or not _ys_pass_check:
         log.warning("YS_USER / YS_PASSWORD not set — login will fail")
     if not GITHUB_TOKEN:
         log.info("GITHUB_TOKEN not set — GitHub push disabled")
