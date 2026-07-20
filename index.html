@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Agent System — Web UI</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Prism for code highlighting -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css" />
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+
+  <style>
+    html, body, #app { height: 100%; }
+    .message-bubble { white-space: pre-wrap; word-wrap: break-word; }
+    .chat-scroll::-webkit-scrollbar { width: 8px; }
+    .chat-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 8px; }
+  </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+<div id="app" class="h-full flex flex-col">
+  <!-- Header -->
+  <header class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm">
+    <div class="flex items-center gap-4">
+      <button id="sidebarToggle" class="md:hidden p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800">☰</button>
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-pink-500 rounded flex items-center justify-center text-white font-bold">AS</div>
+        <h1 class="text-lg font-semibold">Agent System</h1>
+      </div>
+      <div class="hidden sm:block ml-4">
+        <input id="globalSearch" placeholder="Search conversations, files, agents..." class="px-3 py-2 rounded bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700" />
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <select id="modelSelector" class="p-2 rounded bg-white dark:bg-gray-800 border dark:border-gray-700"></select>
+      <div class="text-sm text-gray-600 dark:text-gray-300" id="userDisplay">User</div>
+      <a href="/logout" class="text-indigo-600 dark:text-indigo-400">Logout</a>
+    </div>
+  </header>
+
+  <div class="flex flex-1 overflow-hidden">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="w-80 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 p-4 overflow-y-auto hidden md:block">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-semibold">Conversations</h2>
+        <button id="newConv" class="p-2 rounded bg-indigo-600 text-white text-xs">New</button>
+      </div>
+      <div id="conversationsList" class="space-y-2"></div>
+
+      <div class="mt-6">
+        <h3 class="text-xs uppercase text-gray-500 dark:text-gray-400 mb-2">Workspace</h3>
+        <div id="workspaceTree" class="space-y-1 text-sm text-gray-700 dark:text-gray-300"></div>
+        <div class="mt-3">
+          <input id="fileUploadInput" type="file" multiple class="hidden" />
+          <button id="uploadBtn" class="px-3 py-1 bg-indigo-600 text-white rounded">Upload</button>
+        </div>
+      </div>
+
+      <div class="mt-6">
+        <h3 class="text-xs uppercase text-gray-500 dark:text-gray-400 mb-2">Agents</h3>
+        <div id="agentsList" class="space-y-2 text-sm"></div>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="flex-1 flex flex-col">
+      <section id="chatArea" class="flex-1 p-4 overflow-auto chat-scroll">
+        <div id="messages" class="max-w-3xl mx-auto space-y-4"></div>
+      </section>
+
+      <footer class="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+        <div class="max-w-3xl mx-auto">
+          <form id="composer" class="flex gap-3">
+            <textarea id="inputText" rows="1" placeholder="Send a message..." class="flex-1 resize-none bg-gray-100 dark:bg-gray-800 border rounded p-3"></textarea>
+            <button id="sendBtn" type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded">Send</button>
+          </form>
+          <div class="mt-2 text-xs text-gray-500 flex justify-between">
+            <div id="typingIndicator" class="italic text-gray-400"></div>
+            <div>Streaming • Markdown • Code</div>
+          </div>
+        </div>
+      </footer>
+    </main>
+
+    <!-- Right panel -->
+    <aside id="rightPanel" class="w-96 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 p-4 hidden lg:block overflow-y-auto">
+      <h3 class="text-sm font-semibold mb-3">Workspace Editor</h3>
+      <div id="editorContainer" class="h-72 border rounded bg-gray-50 dark:bg-gray-800 p-2 overflow-auto">
+        <pre id="fileEditor" class="whitespace-pre-wrap"></pre>
+      </div>
+
+      <h3 class="text-sm font-semibold mt-4">Terminal</h3>
+      <div id="terminalContainer" class="h-44 bg-black text-white p-2 overflow-auto" style="font-family: monospace; font-size: 13px;"></div>
+
+      <h3 class="text-sm font-semibold mt-4">Logs</h3>
+      <div id="logsContainer" class="h-40 bg-gray-800 text-gray-100 p-2 overflow-auto" style="font-family: monospace; font-size: 12px;"></div>
+    </aside>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script>
+const API = {
+  models: () => fetch('/api/models').then(r => r.json()),
+  switchModel: (m) => fetch('/api/models/switch', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({model: m})}).then(r => r.json()),
+  conversations: () => fetch('/api/conversations').then(r => r.json()),
+  createConversation: () => fetch('/api/conversations', {method:'POST', headers:{'Content-Type':'application/json'}}).then(r => r.json()),
+  getConversation: (id) => fetch(`/api/conversation/${id}`).then(r => r.json()),
+  chat: (conv, msg) => fetch('/api/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({conversation_id: conv, message: msg})}).then(r => r.json()),
+  chatStream: (conv, msg, model) => fetch('/api/chat/stream', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({conversation_id: conv, message: msg, model})}),
+  filesList: (path='') => fetch(`/api/files/list?path=${encodeURIComponent(path)}`).then(r => r.json()),
+  filesRead: (path) => fetch(`/api/files/read?path=${encodeURIComponent(path)}`).then(r => r.json()),
+  filesUpload: (path, formData) => fetch(`/api/files/upload?path=${encodeURIComponent(path)}`, {method:'POST', body: formData}).then(r => r.json()),
+  agents: () => fetch('/api/agents').then(r => r.json()),
+  agentRun: (name, payload) => fetch(`/api/agents/${name}/run`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)}).then(r => r.json()),
+  terminalExec: (cmd) => fetch('/api/terminal/exec', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({cmd})})
+};
+
+let activeConv = null;
+let activeModel = null;
+
+function escapeHtml(s) {
+  if (!s) return '';
+  return s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+}
+
+async function init() {
+  try {
+    const modelsRes = await API.models();
+    if (modelsRes.ok) {
+      const select = document.getElementById('modelSelector');
+      select.innerHTML = '';
+      (modelsRes.detected || []).forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = m;
+        select.appendChild(opt);
+      });
+      activeModel = modelsRes.active;
+      if (activeModel) select.value = activeModel;
+      select.addEventListener('change', async (e) => {
+        const m = e.target.value;
+        const r = await API.switchModel(m);
+        if (r.ok) {
+          activeModel = r.active;
+          appendLog(`Switched model to ${activeModel}`);
+        } else {
+          appendLog('Failed to switch model: ' + (r.error||''));
+        }
+      });
+    } else {
+      appendLog('Failed to load models: ' + (modelsRes.error||''));
+    }
+  } catch (err) {
+    console.error(err);
+  }
+
+  await loadConversations();
+  await loadWorkspace();
+  loadAgents();
+}
+
+async function loadConversations() {
+  const res = await API.conversations();
+  if (!res.ok) return;
+  const list = document.getElementById('conversationsList');
+  list.innerHTML = '';
+  (res.conversations || []).forEach(c => {
+    const el = document.createElement('div');
+    el.className = 'p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer';
+    el.innerHTML = `<div class="font-medium">${escapeHtml(c.title)}</div><div class="text-xs text-gray-500">${new Date((c.updated||0)*1000).toLocaleString()}</div>`;
+    el.addEventListener('click', () => openConversation(c.id));
+    list.appendChild(el);
+  });
+}
+
+async function openConversation(id) {
+  const res = await API.getConversation(id);
+  if (!res.ok) return;
+  activeConv = res.conversation.id;
+  renderMessages(res.conversation.messages || []);
+}
+
+function renderMessages(messages) {
+  const container = document.getElementById('messages');
+  container.innerHTML = '';
+  messages.forEach(m => {
+    const wrapper = document.createElement('div');
+    wrapper.className = m.role === 'user' ? 'flex justify-end' : 'flex justify-start';
+    const bubble = document.createElement('div');
+    bubble.className = m.role === 'user' ? 'bg-indigo-600 text-white px-4 py-2 rounded-xl message-bubble' : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-4 py-2 rounded-xl message-bubble';
+    bubble.innerHTML = m.content;
+    wrapper.appendChild(bubble);
+    container.appendChild(wrapper);
+  });
+  container.scrollTop = container.scrollHeight;
+}
+
+document.getElementById('newConv').addEventListener('click', async () => {
+  const res = await API.createConversation();
+  if (res.ok) {
+    await loadConversations();
+  }
+});
+
+const composer = document.getElementById('composer');
+composer.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const txt = document.getElementById('inputText');
+  const content = txt.value.trim();
+  if (!content) return;
+  if (!activeConv) {
+    const c = await API.createConversation();
+    if (c.ok) {
+      activeConv = c.conversation.id;
+      await loadConversations();
+    } else {
+      appendLog('Failed to create conversation');
+      return;
+    }
+  }
+  const messagesDiv = document.getElementById('messages');
+  const um = document.createElement('div'); um.className='flex justify-end';
+  um.innerHTML = `<div class="bg-indigo-600 text-white px-4 py-2 rounded-xl message-bubble">${escapeHtml(content)}</div>`;
+  messagesDiv.appendChild(um);
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  txt.value = '';
+  startStreamingResponse(activeConv, content);
+});
+
+async function startStreamingResponse(convId, message) {
+  const typing = document.getElementById('typingIndicator');
+  typing.textContent = 'AI is typing...';
+  try {
+    const res = await API.chatStream(convId, message, activeModel);
+    if (!res.ok) {
+      const err = await res.json();
+      appendLog('Chat error: ' + (err.error||''));
+      typing.textContent = '';
+      return;
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, {stream: true});
+      chunk.split('\n').forEach(line => {
+        if (!line) return;
+        try {
+          const obj = JSON.parse(line);
+          if (obj.type === 'partial') {
+            updateLastAssistant(obj.text);
+          } else if (obj.type === 'done') {
+            updateLastAssistant(obj.text, true);
+          }
+        } catch (e) {
+        }
+      });
+    }
+  } catch (err) {
+    appendLog('Stream error: ' + err);
+  } finally {
+    document.getElementById('typingIndicator').textContent = '';
+  }
+}
+
+function updateLastAssistant(text, finalize=false) {
+  const container = document.getElementById('messages');
+  const last = container.lastElementChild;
+  if (last && last.classList.contains('assistant-updating')) {
+    last.querySelector('.message-bubble').textContent = text;
+    if (finalize) last.classList.remove('assistant-updating');
+  } else {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'flex justify-start assistant-updating';
+    const bubble = document.createElement('div');
+    bubble.className = 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-4 py-2 rounded-xl message-bubble';
+    bubble.textContent = text;
+    wrapper.appendChild(bubble);
+    container.appendChild(wrapper);
+    container.scrollTop = container.scrollHeight;
+  }
+  container.scrollTop = container.scrollHeight;
+}
+
+function appendLog(text) {
+  const logs = document.getElementById('logsContainer');
+  logs.textContent += `[${new Date().toLocaleTimeString()}] ${text}\n`;
+  logs.scrollTop = logs.scrollHeight;
+}
+
+async function loadWorkspace(path='') {
+  try {
+    const res = await API.filesList(path);
+    if (!res.ok) return;
+    const tree = document.getElementById('workspaceTree');
+    tree.innerHTML = '';
+    (res.files || []).forEach(f => {
+      const el = document.createElement('div');
+      el.className = 'flex items-center justify-between p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800';
+      el.innerHTML = `<div>${escapeHtml(f.name)}</div><div><button data-path="${f.path}" class="openFile text-xs px-2 py-1 rounded bg-gray-200 dark:bg-gray-800">Open</button></div>`;
+      tree.appendChild(el);
+    });
+    document.querySelectorAll('.openFile').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const p = e.currentTarget.dataset.path;
+        const r = await API.filesRead(p);
+        if (r.ok) {
+          document.getElementById('fileEditor').textContent = r.text;
+        } else {
+          appendLog('Cannot preview: ' + (r.error || ''));
+        }
+      });
+    });
+  } catch (err) {
+    appendLog('Workspace load failed: ' + err);
+  }
+}
+
+document.getElementById('uploadBtn').addEventListener('click', () => {
+  document.getElementById('fileUploadInput').click();
+});
+document.getElementById('fileUploadInput').addEventListener('change', async (e) => {
+  const files = e.target.files;
+  const fd = new FormData();
+  for (let i=0;i<files.length;i++) fd.append('file'+i, files[i]);
+  const res = await API.filesUpload('', fd);
+  if (res.ok) {
+    appendLog('Uploaded: ' + (res.saved || []).join(', '));
+    await loadWorkspace();
+  } else {
+    appendLog('Upload failed: ' + (res.error || ''));
+  }
+});
+
+async function loadAgents() {
+  try {
+    const res = await API.agents();
+    if (!res.ok) return;
+    const al = document.getElementById('agentsList');
+    al.innerHTML = '';
+    (res.agents || []).forEach(a => {
+      const el = document.createElement('div');
+      el.className = 'flex items-center justify-between p-2 border rounded';
+      el.innerHTML = `<div><div class="font-medium">${a.name}</div><div class="text-xs text-gray-500">status: ${a.status}</div></div><div><button class="runAgent px-2 py-1 bg-indigo-600 text-white rounded" data-agent="${a.name}">Run</button></div>`;
+      al.appendChild(el);
+    });
+    document.querySelectorAll('.runAgent').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const name = e.currentTarget.dataset.agent;
+        const task = prompt('Task input for ' + name);
+        if (!task) return;
+        const r = await API.agentRun(name, {task});
+        if (r.ok) {
+          appendLog('Agent started job ' + r.job_id);
+        } else {
+          appendLog('Agent run failed: ' + (r.error||''));
+        }
+      });
+    });
+  } catch (err) {
+    appendLog('Failed to load agents: ' + err);
+  }
+}
+
+document.getElementById('terminalContainer').addEventListener('dblclick', async () => {
+  const cmd = prompt('Enter command to run in workspace root', 'ls -la');
+  if (!cmd) return;
+  const res = await API.terminalExec(cmd);
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  const term = document.getElementById('terminalContainer');
+  term.textContent = '';
+  while (true) {
+    const {done, value} = await reader.read();
+    if (done) break;
+    const chunk = decoder.decode(value);
+    chunk.split('\n').forEach(line => {
+      if (!line) return;
+      try {
+        const obj = JSON.parse(line);
+        if (obj.stream === 'stdout' || obj.stream === 'stderr') {
+          term.textContent += obj.line + '\n';
+        } else if (obj.stream === 'exit') {
+          term.textContent += '[exit '+obj.code+']\n';
+        } else {
+          term.textContent += JSON.stringify(obj) + '\n';
+        }
+      } catch (e) {
+        term.textContent += line + '\n';
+      }
+    });
+    term.scrollTop = term.scrollHeight;
+  }
+});
+
+window.addEventListener('DOMContentLoaded', () => {
+  init();
+});
+</script>
+</body>
+</html>
