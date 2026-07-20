@@ -1,0 +1,3 @@
+---
+Apply integration changes: register tools blueprint and initialize DB during startup.
+---
