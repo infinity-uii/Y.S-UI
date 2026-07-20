@@ -11,6 +11,9 @@ class Settings:
     WORKSPACE_DIR: str
     LOG_LEVEL: str
     MCP_SERVERS: str
+    GOOGLE_SEARCH_API_KEY: str
+    GOOGLE_SEARCH_ENGINE_ID: str
+    TELEGRAM_BOT_TOKEN: str
 
     def __init__(self):
         self.DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -21,5 +24,8 @@ class Settings:
         self.WORKSPACE_DIR = os.environ.get("WORKSPACE_DIR", "./workspace")
         self.LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
         self.MCP_SERVERS = os.environ.get("MCP_SERVERS", "")
+        self.GOOGLE_SEARCH_API_KEY = os.environ.get("GOOGLE_SEARCH_API_KEY", "")
+        self.GOOGLE_SEARCH_ENGINE_ID = os.environ.get("GOOGLE_SEARCH_ENGINE_ID", "")
+        self.TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 
 settings = Settings()
