@@ -1,0 +1,1 @@
+web: bash -lc 'gunicorn -w ${WEB_CONCURRENCY:-4} -b 0.0.0.0:$PORT "agent_system:app"' + "\n"
