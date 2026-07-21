@@ -1,119 +1,975 @@
 <!doctype html>
 <html lang="en">
 <head>
-... (unchanged header) ...
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Y.S Agent System</title>
+<style>
+:root{
+  --bg:#0a0e14;--bg2:#0f141c;--bg3:#151b26;--bg4:#1a2230;
+  --border:#1e2733;--border2:#2a3545;
+  --text:#e6edf3;--text2:#9ba8b8;--text3:#6b7785;
+  --primary:#00d4ff;--primary2:#0099cc;--primary-dim:rgba(0,212,255,.12);
+  --accent:#00ff88;--accent-dim:rgba(0,255,136,.1);
+  --success:#00ff88;--warning:#ffb000;--error:#ff4757;--error-dim:rgba(255,71,87,.1);
+  --purple:#a78bfa;--orange:#ff8c42;
+  --radius:10px;--radius-sm:6px;
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  --mono:"SF Mono",Fira Code,JetBrains Mono,Consolas,monospace;
+  --sidebar-w:240px;--rightpanel-w:340px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text3)}
+
+/* Layout */
+#app{display:flex;height:100vh}
+#sidebar{width:var(--sidebar-w);background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;transition:width .2s}
+#main{flex:1;display:flex;flex-direction:column;min-width:0}
+#content{flex:1;overflow-y:auto;position:relative}
+#rightpanel{width:var(--rightpanel-w);background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;transition:width .2s}
+
+/* Sidebar */
+.sidebar-header{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.sidebar-logo{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,var(--primary),var(--accent));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:var(--bg)}
+.sidebar-title{font-size:15px;font-weight:600;letter-spacing:-.3px}
+.sidebar-section{padding:8px 12px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text3)}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 18px;cursor:pointer;color:var(--text2);font-size:13px;transition:all .15s;border-left:2px solid transparent}
+.nav-item:hover{background:var(--bg3);color:var(--text)}
+.nav-item.active{background:var(--primary-dim);color:var(--primary);border-left-color:var(--primary)}
+.nav-icon{font-size:16px;width:20px;text-align:center}
+.sidebar-footer{margin-top:auto;padding:12px 18px;border-top:1px solid var(--border);font-size:11px;color:var(--text3)}
+.sidebar-footer a{color:var(--primary);text-decoration:none}
+
+/* Main header */
+.main-header{padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg2);min-height:52px}
+.main-header h1{font-size:16px;font-weight:600}
+.header-actions{display:flex;gap:8px;align-items:center}
+
+/* Buttons */
+.btn{padding:7px 14px;border-radius:var(--radius-sm);border:1px solid var(--border2);background:var(--bg3);color:var(--text);font-size:13px;cursor:pointer;transition:all .15s;font-family:var(--font)}
+.btn:hover{background:var(--bg4);border-color:var(--text3)}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--primary);color:var(--bg);border-color:var(--primary);font-weight:600}
+.btn-primary:hover{background:var(--primary2)}
+.btn-sm{padding:4px 10px;font-size:12px}
+.btn-danger{border-color:var(--error);color:var(--error)}
+.btn-danger:hover{background:var(--error-dim)}
+.btn-ghost{border-color:transparent;background:transparent}
+.btn-ghost:hover{background:var(--bg3)}
+
+/* Inputs */
+input,textarea,select{background:var(--bg);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:8px 12px;color:var(--text);font-size:13px;font-family:var(--font);outline:none;transition:border .15s}
+input:focus,textarea:focus,select:focus{border-color:var(--primary)}
+textarea{resize:vertical;min-height:80px}
+
+/* Pages */
+.page{display:none;padding:20px;max-width:1000px;margin:0 auto}
+.page.active{display:block}
+
+/* Cards */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.agent-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;transition:all .15s;cursor:pointer}
+.agent-card:hover{border-color:var(--primary);box-shadow:0 0 0 1px var(--primary-dim)}
+
+/* Chat */
+.chat-container{display:flex;flex-direction:column;height:calc(100vh - 52px);max-width:900px;margin:0 auto}
+.chat-messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px}
+.chat-msg{max-width:75%;padding:12px 16px;border-radius:12px;font-size:14px;line-height:1.6;white-space:pre-wrap;word-break:break-word;animation:fadeIn .2s}
+.chat-msg.user{align-self:flex-end;background:var(--primary);color:var(--bg);border-bottom-right-radius:4px}
+.chat-msg.assistant{align-self:flex-start;background:var(--bg3);border:1px solid var(--border);border-bottom-left-radius:4px}
+.chat-msg pre{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;overflow-x:auto;margin:8px 0;font-family:var(--mono);font-size:12px}
+.chat-msg code{font-family:var(--mono);font-size:13px}
+.chat-input-area{padding:16px 20px;border-top:1px solid var(--border);background:var(--bg2)}
+.chat-input-row{display:flex;gap:10px;align-items:flex-end}
+.chat-input-row textarea{flex:1;min-height:44px;max-height:200px;resize:none}
+
+/* Badges */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-success{background:var(--accent-dim);color:var(--success)}
+.badge-warning{background:rgba(255,176,0,.12);color:var(--warning)}
+.badge-error{background:var(--error-dim);color:var(--error)}
+.badge-primary{background:var(--primary-dim);color:var(--primary)}
+
+/* Toggle */
+.toggle{position:relative;width:38px;height:22px;background:var(--border2);border-radius:11px;cursor:pointer;transition:background .2s;flex-shrink:0}
+.toggle.on{background:var(--primary)}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;background:var(--text);border-radius:50%;transition:transform .2s}
+.toggle.on::after{transform:translateX(16px)}
+
+/* Right panel tabs */
+.rp-tabs{display:flex;border-bottom:1px solid var(--border)}
+.rp-tab{flex:1;padding:10px;text-align:center;cursor:pointer;font-size:12px;color:var(--text2);border-bottom:2px solid transparent;transition:all .15s}
+.rp-tab:hover{color:var(--text)}
+.rp-tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+.rp-content{flex:1;overflow-y:auto;padding:12px}
+
+/* File tree */
+.file-tree-item{display:flex;align-items:center;gap:6px;padding:5px 8px;cursor:pointer;font-size:13px;border-radius:4px;transition:background .1s}
+.file-tree-item:hover{background:var(--bg3)}
+.file-tree-item.active{background:var(--primary-dim);color:var(--primary)}
+
+/* Toast */
+#toast-container{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px}
+.toast{padding:10px 16px;border-radius:8px;font-size:13px;animation:slideIn .2s;max-width:350px;box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.toast.info{background:var(--bg3);border:1px solid var(--border2);color:var(--text)}
+.toast.success{background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent)}
+.toast.error{background:var(--error-dim);border:1px solid var(--error);color:var(--error)}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:1000;animation:fadeIn .15s}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);padding:24px;min-width:400px;max-width:600px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+.modal h2{font-size:18px;margin-bottom:16px}
+
+/* Animations */
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.pulse{animation:pulse 1.5s infinite}
+
+/* Responsive */
+@media(max-width:768px){
+  :root{--sidebar-w:0px;--rightpanel-w:0px}
+  #sidebar{position:fixed;z-index:100;height:100vh;width:240px;transform:translateX(-100%)}
+  #sidebar.open{transform:translateX(0);width:240px}
+  #rightpanel{position:fixed;z-index:100;height:100vh;right:0;width:300px;transform:translateX(100%)}
+  #rightpanel.open{transform:translateX(0)}
+  .mobile-menu-btn{display:flex!important}
+  .chat-msg{max-width:90%}
+  .page{padding:14px}
+}
+.mobile-menu-btn{display:none;align-items:center;justify-content:center;width:36px;height:36px;border-radius:6px;border:1px solid var(--border2);background:var(--bg3);cursor:pointer;color:var(--text);font-size:18px}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text2);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+td{padding:8px 12px;border-bottom:1px solid var(--border)}
+tr:hover td{background:var(--bg3)}
+
+/* Misc */
+.empty-state{text-align:center;padding:40px 20px;color:var(--text3)}
+.empty-state-icon{font-size:48px;margin-bottom:12px;opacity:.5}
+.flex{display:flex}
+.flex-col{flex-direction:column}
+.gap-8{gap:8px}.gap-12{gap:12px}.gap-16{gap:16px}
+.items-center{align-items:center}
+.justify-between{justify-content:space-between}
+.mt-8{margin-top:8px}.mt-12{margin-top:12px}.mt-16{margin-top:16px}.mt-20{margin-top:20px}
+.mb-8{margin-bottom:8px}.mb-12{margin-bottom:12px}.mb-16{margin-bottom:16px}
+.text-sm{font-size:12px}.text-xs{font-size:11px}
+.text-muted{color:var(--text2)}.text-dim{color:var(--text3)}
+.font-mono{font-family:var(--mono)}
+.w-full{width:100%}
+.hidden{display:none!important}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid-3{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+</style>
 </head>
 <body>
 <div id="app">
-  <!-- existing content above -->
-  <!-- add Tools nav item -->
-  <!-- Inserted into the sidebar nav (ensure it matches CSS classes) -->
-  <!-- ... existing sidebar ... -->
-</div>
-
-<!-- Tools page (inserted next to other pages) -->
-<div class="page" id="page-tools" style="display:none;">
-  <div style="padding:20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
-    <div>
-      <div style="font-size:18px;font-weight:600;">Tools</div>
-      <div style="color:var(--text2);font-size:13px;margin-top:2px;">Discovered MCP tools and local stdio tools</div>
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">YS</div>
+      <div class="sidebar-title">Y.S Agent System</div>
     </div>
-    <div style="display:flex;gap:8px;">
-      <button class="btn" id="refresh-tools-btn">↻ Refresh</button>
+    <div class="sidebar-section">Main</div>
+    <div class="nav-item active" data-page="chat"><span class="nav-icon">💬</span> Chat</div>
+    <div class="nav-item" data-page="agents"><span class="nav-icon">🤖</span> Agents</div>
+    <div class="nav-item" data-page="compare"><span class="nav-icon">⚖️</span> Compare</div>
+    <div class="nav-item" data-page="knowledge"><span class="nav-icon">📚</span> Knowledge</div>
+    <div class="nav-item" data-page="tools"><span class="nav-icon">🧰</span> Tools</div>
+    <div class="nav-item" data-page="plugins"><span class="nav-icon">🔌</span> Plugins</div>
+    <div class="sidebar-section">System</div>
+    <div class="nav-item" data-page="admin"><span class="nav-icon">📊</span> Admin</div>
+    <div class="nav-item" data-page="settings"><span class="nav-icon">⚙️</span> Settings</div>
+    <div class="sidebar-footer">
+      <div id="status-indicator" class="flex items-center gap-8">
+        <span class="badge badge-success"><span class="pulse">●</span> Online</span>
+      </div>
+      <div class="mt-8" id="active-provider-display"></div>
     </div>
   </div>
-  <div style="flex:1;overflow-y:auto;padding:20px;">
-    <div id="tools-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;"></div>
-    <div id="tool-run-output" style="margin-top:12px;background:var(--bg);border:1px solid var(--border);padding:12px;border-radius:8px;white-space:pre-wrap;font-family:monospace;max-height:320px;overflow:auto;display:none;"></div>
-  </div>
-</div>
 
-<script>
-// Tools JS
-async function loadTools(){
-  const res = await API.get('/api/tools');
-  if(!res?.ok) return;
-  const list = document.getElementById('tools-list');
-  list.innerHTML = '';
-  res.tools.forEach(t=>{
-    const card = document.createElement('div');
-    card.className = 'agent-card';
-    card.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-        <div>
-          <div style="font-weight:600">${esc(t.label)} <span style="font-size:12px;color:var(--text3);">(${esc(t.name)})</span></div>
-          <div style="font-size:12px;color:var(--text2);margin-top:6px;">${esc(t.description)}</div>
-          <div style="font-size:12px;color:var(--text3);margin-top:6px;">Transport: ${esc(t.transport)} • Endpoint: ${esc(t.endpoint)}</div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
-          <label style="font-size:12px;color:var(--text3);">Enabled
-            <input type="checkbox" class="tool-enabled" data-name="${esc(t.name)}" ${t.enabled? 'checked':''} />
-          </label>
-          <button class="btn btn-sm run-tool-btn" data-name="${esc(t.name)}">Run</button>
+  <!-- Main content -->
+  <div id="main">
+    <div class="main-header">
+      <div class="flex items-center gap-12">
+        <button class="mobile-menu-btn" id="mobile-menu-toggle">☰</button>
+        <h1 id="page-title">Chat</h1>
+      </div>
+      <div class="header-actions">
+        <select id="provider-select" class="btn btn-sm" style="min-width:120px"></select>
+        <select id="model-select" class="btn btn-sm" style="min-width:140px"></select>
+        <button class="btn btn-sm btn-ghost" id="rightpanel-toggle">📋</button>
+      </div>
+    </div>
+    <div id="content">
+      <!-- Chat page -->
+      <div class="page active" id="page-chat">
+        <div class="chat-container">
+          <div class="chat-messages" id="chat-messages">
+            <div class="empty-state">
+              <div class="empty-state-icon">💬</div>
+              <div>Start a conversation with the AI</div>
+            </div>
+          </div>
+          <div class="chat-input-area">
+            <div class="chat-input-row">
+              <textarea id="chat-input" placeholder="Type a message... (Enter to send, Shift+Enter for new line)" rows="1"></textarea>
+              <button class="btn btn-primary" id="chat-send">Send</button>
+            </div>
+            <div class="flex items-center gap-12 mt-8">
+              <label class="flex items-center gap-8 text-sm text-muted"><input type="checkbox" id="chat-rag"> Use RAG</label>
+              <select id="chat-agent-select" class="btn btn-sm" style="min-width:140px"><option value="">No agent</option></select>
+            </div>
+          </div>
         </div>
       </div>
-    `;
+
+      <!-- Agents page -->
+      <div class="page" id="page-agents">
+        <div class="flex justify-between items-center mb-16">
+          <div class="text-muted text-sm">15 specialized AI agents for different tasks</div>
+          <button class="btn btn-sm" id="refresh-agents">↻ Refresh</button>
+        </div>
+        <div class="grid-3" id="agents-list"></div>
+      </div>
+
+      <!-- Compare page -->
+      <div class="page" id="page-compare">
+        <div class="card mb-12">
+          <div class="font-semibold mb-8">Compare Models Side by Side</div>
+          <textarea id="compare-input" placeholder="Enter a prompt to compare across models..." rows="3" class="w-full"></textarea>
+          <div class="flex gap-12 mt-12 items-center">
+            <button class="btn btn-primary" id="compare-run">Compare</button>
+            <span class="text-sm text-muted">Select models below:</span>
+          </div>
+        </div>
+        <div class="grid-2" id="compare-models-list"></div>
+        <div class="grid-2 mt-16" id="compare-results"></div>
+      </div>
+
+      <!-- Knowledge page -->
+      <div class="page" id="page-knowledge">
+        <div class="card mb-12">
+          <div class="font-semibold mb-8">Ingest Knowledge</div>
+          <textarea id="rag-text" placeholder="Paste text to add to the knowledge base..." rows="5" class="w-full"></textarea>
+          <div class="flex gap-12 mt-12 items-center">
+            <input id="rag-source" placeholder="Source name" style="width:200px">
+            <button class="btn btn-primary" id="rag-ingest">Ingest</button>
+            <button class="btn btn-danger" id="rag-clear">Clear All</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="font-semibold mb-8">Search Knowledge Base</div>
+          <div class="flex gap-12">
+            <input id="rag-query" placeholder="Search query..." class="w-full">
+            <button class="btn btn-primary" id="rag-search">Search</button>
+          </div>
+          <div id="rag-results" class="mt-16"></div>
+        </div>
+      </div>
+
+      <!-- Tools page -->
+      <div class="page" id="page-tools">
+        <div class="flex justify-between items-center mb-16">
+          <div>
+            <div style="font-size:16px;font-weight:600">Tools</div>
+            <div class="text-muted text-sm mt-8">Discovered MCP tools and local stdio tools</div>
+          </div>
+          <button class="btn btn-sm" id="refresh-tools">↻ Refresh</button>
+        </div>
+        <div class="grid-3" id="tools-list"></div>
+        <div id="tool-run-output" class="card font-mono hidden" style="white-space:pre-wrap;max-height:320px;overflow:auto"></div>
+      </div>
+
+      <!-- Plugins page -->
+      <div class="page" id="page-plugins">
+        <div class="text-muted text-sm mb-16">Built-in plugins for extended capabilities</div>
+        <div class="grid-3" id="plugins-list"></div>
+      </div>
+
+      <!-- Admin page -->
+      <div class="page" id="page-admin">
+        <div class="grid-2 mb-16">
+          <div class="card">
+            <div class="font-semibold mb-12">System Stats</div>
+            <div id="admin-stats"></div>
+          </div>
+          <div class="card">
+            <div class="font-semibold mb-12">Provider Usage</div>
+            <div id="admin-usage"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="font-semibold mb-12">Provider Health</div>
+          <div id="admin-health"></div>
+        </div>
+      </div>
+
+      <!-- Settings page -->
+      <div class="page" id="page-settings">
+        <div class="card mb-12">
+          <div class="font-semibold mb-12">Active Provider & Model</div>
+          <div class="flex gap-12 items-center">
+            <select id="settings-provider" class="btn" style="min-width:160px"></select>
+            <select id="settings-model" class="btn" style="min-width:200px"></select>
+            <button class="btn btn-primary" id="settings-apply">Apply</button>
+          </div>
+        </div>
+        <div class="card mb-12">
+          <div class="font-semibold mb-12">Provider Management</div>
+          <div id="settings-providers"></div>
+        </div>
+        <div class="card">
+          <div class="font-semibold mb-12">API Keys</div>
+          <div class="text-sm text-muted mb-12">Add multiple keys per provider (comma-separated) for rotation and failover.</div>
+          <div id="settings-keys"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right panel -->
+  <div id="rightpanel">
+    <div class="rp-tabs">
+      <div class="rp-tab active" data-rptab="files">Files</div>
+      <div class="rp-tab" data-rptab="terminal">Terminal</div>
+      <div class="rp-tab" data-rptab="logs">Logs</div>
+    </div>
+    <div class="rp-content" id="rp-content"></div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<div id="modal-root"></div>
+
+<script>
+// ---------------------------------------------------------------------------
+// State & utilities
+// ---------------------------------------------------------------------------
+const State = {
+  currentPage: 'chat',
+  providers: [],
+  activeProvider: '',
+  models: [],
+  activeModel: '',
+  agents: {},
+  conversations: {},
+  currentChat: [],
+  rightPanelTab: 'files',
+  fileTree: [],
+  compareSelected: new Set(),
+};
+
+function esc(s){if(s==null)return'';return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function toast(msg,type='info'){const c=document.getElementById('toast-container');const t=document.createElement('div');t.className='toast '+type;t.textContent=msg;c.appendChild(t);setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),300)},3000)}
+
+const API = {
+  async get(url){
+    const res = await fetch(url,{headers:API._headers()});
+    return res.ok?res.json():null;
+  },
+  async post(url,body){
+    const res = await fetch(url,{method:'POST',headers:{...API._headers(),'Content-Type':'application/json'},body:JSON.stringify(body||{})});
+    return res.ok?res.json():{ok:false,error:await res.text()};
+  },
+  async del(url){
+    const res = await fetch(url,{method:'DELETE',headers:API._headers()});
+    return res.ok?res.json():null;
+  },
+  _headers(){
+    const h={};
+    const key=localStorage.getItem('api_key');
+    if(key)h['X-API-Key']=key;
+    return h;
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Navigation
+// ---------------------------------------------------------------------------
+function navigateTo(page){
+  State.currentPage=page;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const pageEl=document.getElementById('page-'+page);
+  if(pageEl)pageEl.classList.add('active');
+  document.querySelectorAll(`.nav-item[data-page="${page}"]`).forEach(n=>n.classList.add('active'));
+  const titles={chat:'Chat',agents:'Agents',compare:'Compare Models',knowledge:'Knowledge / RAG',tools:'Tools',plugins:'Plugins',admin:'Admin',settings:'Settings'};
+  document.getElementById('page-title').textContent=titles[page]||page;
+  if(page==='agents')loadAgents();
+  if(page==='tools')loadTools();
+  if(page==='plugins')loadPlugins();
+  if(page==='admin')loadAdmin();
+  if(page==='settings')loadSettings();
+  if(page==='compare')loadCompareModels();
+  if(window.innerWidth<=768)document.getElementById('sidebar').classList.remove('open');
+}
+
+document.querySelectorAll('.nav-item').forEach(n=>n.addEventListener('click',()=>navigateTo(n.dataset.page)));
+
+document.getElementById('mobile-menu-toggle')?.addEventListener('click',()=>document.getElementById('sidebar').classList.toggle('open'));
+document.getElementById('rightpanel-toggle')?.addEventListener('click',()=>document.getElementById('rightpanel').classList.toggle('open'));
+
+// ---------------------------------------------------------------------------
+// Provider & model selectors
+// ---------------------------------------------------------------------------
+async function loadProviders(){
+  const res=await API.get('/api/providers');
+  if(!res?.ok)return;
+  State.providers=res.providers||[];
+  State.activeProvider=res.active||'';
+  renderProviderSelects();
+  document.getElementById('active-provider-display').textContent='Provider: '+(State.activeProvider||'none');
+}
+
+function renderProviderSelects(){
+  const hdr=document.getElementById('provider-select');
+  const set=document.getElementById('settings-provider');
+  const opts=State.providers.map(p=>`<option value="${p.name}" ${p.name===State.activeProvider?'selected':''}>${p.name}${p.enabled?'':' (disabled)'}</option>`).join('');
+  hdr.innerHTML=opts;
+  if(set)set.innerHTML=opts;
+  hdr.onchange=async()=>{
+    await API.post('/api/providers/switch',{provider:hdr.value});
+    State.activeProvider=hdr.value;
+    await loadModels();
+    toast('Switched to '+hdr.value,'success');
+  };
+}
+
+async function loadModels(){
+  const res=await API.get('/api/models?provider='+State.activeProvider);
+  if(!res?.ok)return;
+  State.models=res.models||[];
+  State.activeModel=res.active||'';
+  renderModelSelects();
+}
+
+function renderModelSelects(){
+  const hdr=document.getElementById('model-select');
+  const set=document.getElementById('settings-model');
+  const opts=State.models.map(m=>`<option value="${m}" ${m===State.activeModel?'selected':''}>${m}</option>`).join('');
+  hdr.innerHTML=opts||'<option value="">Default</option>';
+  if(set)set.innerHTML=opts||'<option value="">Default</option>';
+  hdr.onchange=async()=>{
+    await API.post('/api/models/switch',{model:hdr.value});
+    State.activeModel=hdr.value;
+    toast('Model: '+hdr.value,'success');
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Chat
+// ---------------------------------------------------------------------------
+const chatInput=document.getElementById('chat-input');
+const chatSend=document.getElementById('chat-send');
+const chatMessages=document.getElementById('chat-messages');
+
+chatInput.addEventListener('input',()=>{
+  chatInput.style.height='auto';
+  chatInput.style.height=Math.min(chatInput.scrollHeight,200)+'px';
+});
+chatInput.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();}
+});
+
+chatSend.addEventListener('click',sendChat);
+
+async function sendChat(){
+  const msg=chatInput.value.trim();
+  if(!msg)return;
+  chatInput.value='';
+  chatInput.style.height='auto';
+  appendChatMsg('user',msg);
+  const agent=document.getElementById('chat-agent-select').value;
+  const useRag=document.getElementById('chat-rag').checked;
+  if(agent){
+    const res=await API.post('/api/agents/'+agent+'/run',{message:msg});
+    if(res?.ok){
+      pollJob(res.job_id);
+    }else{
+      appendChatMsg('assistant','[Error] '+(res?.error||'Failed'));
+    }
+    return;
+  }
+  // Stream chat
+  const assistantDiv=appendChatMsg('assistant','');
+  assistantDiv.classList.add('pulse');
+  try{
+    const res=await fetch('/api/chat/stream',{method:'POST',headers:{...API._headers(),'Content-Type':'application/json'},body:JSON.stringify({message:msg,rag:useRag,history:State.currentChat})});
+    if(!res.ok){assistantDiv.textContent='[Error] '+await res.text();assistantDiv.classList.remove('pulse');return;}
+    const reader=res.body.getReader();
+    const decoder=new TextDecoder();
+    let fullText='';
+    function read(){
+      reader.read().then(({done,value})=>{
+        if(done){assistantDiv.classList.remove('pulse');renderMarkdown(assistantDiv,fullText);State.currentChat.push({role:'assistant',content:fullText});return;}
+        const chunk=decoder.decode(value);
+        chunk.split('\n').forEach(line=>{
+          if(!line.startsWith('data: '))return;
+          const data=line.slice(6).trim();
+          if(data==='[DONE]')return;
+          try{const j=JSON.parse(data);if(j.text){fullText+=j.text;assistantDiv.textContent=fullText;}if(j.error){assistantDiv.textContent='[Error] '+j.error;}}catch{}
+        });
+        read();
+      });
+    }
+    read();
+  }catch(exc){assistantDiv.textContent='[Error] '+exc;assistantDiv.classList.remove('pulse');}
+  State.currentChat.push({role:'user',content:msg});
+}
+
+function appendChatMsg(role,text){
+  const div=document.createElement('div');
+  div.className='chat-msg '+role;
+  if(text)renderMarkdown(div,text);
+  else div.textContent='';
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop=chatMessages.scrollHeight;
+  return div;
+}
+
+function renderMarkdown(el,text){
+  // Simple markdown: code blocks, inline code, bold, headers
+  let html=esc(text);
+  // Code blocks
+  html=html.replace(/```(\w*)\n([\s\S]*?)```/g,(m,lang,code)=>{
+    return `<pre><code class="language-${lang}">${code}</code></pre>`;
+  });
+  // Inline code
+  html=html.replace(/`([^`]+)`/g,'<code>$1</code>');
+  // Bold
+  html=html.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+  // Headers
+  html=html.replace(/^### (.+)$/gm,'<div style="font-weight:600;margin-top:8px">$1</div>');
+  html=html.replace(/^## (.+)$/gm,'<div style="font-size:15px;font-weight:600;margin-top:8px">$1</div>');
+  html=html.replace(/^# (.+)$/gm,'<div style="font-size:16px;font-weight:600;margin-top:8px">$1</div>');
+  el.innerHTML=html;
+}
+
+function pollJob(jobId){
+  const interval=setInterval(async()=>{
+    const res=await API.get('/api/jobs/'+jobId);
+    if(!res?.ok)return;
+    if(res.job.status==='completed'||res.job.status==='error'){
+      clearInterval(interval);
+      appendChatMsg('assistant',res.job.output||'[No output]');
+    }
+  },1000);
+}
+
+// ---------------------------------------------------------------------------
+// Agents
+// ---------------------------------------------------------------------------
+async function loadAgents(){
+  const res=await API.get('/api/agents');
+  if(!res?.ok)return;
+  State.agents={};
+  const list=document.getElementById('agents-list');
+  list.innerHTML='';
+  const agentSelect=document.getElementById('chat-agent-select');
+  agentSelect.innerHTML='<option value="">No agent</option>';
+  res.agents.forEach(a=>{
+    State.agents[a.name]=a;
+    const card=document.createElement('div');
+    card.className='agent-card';
+    card.innerHTML=`
+      <div class="flex justify-between items-center">
+        <div style="font-weight:600">${esc(a.label)}</div>
+        <span class="badge badge-primary">${esc(a.name)}</span>
+      </div>
+      <div class="text-sm text-muted mt-8">${esc(a.role)}</div>
+      <div class="text-xs text-dim mt-8">Model: ${esc(a.model||'default')} • Provider: ${esc(a.provider||'default')}</div>
+      <div class="flex gap-8 mt-8">${a.tools.map(t=>`<span class="badge badge-success">${esc(t)}</span>`).join('')}</div>
+      <div class="flex gap-8 mt-12">
+        <button class="btn btn-sm btn-primary run-agent-btn" data-name="${esc(a.name)}">Run Agent</button>
+      </div>`;
+    list.appendChild(card);
+    agentSelect.innerHTML+=`<option value="${a.name}">${a.label}</option>`;
+  });
+  list.querySelectorAll('.run-agent-btn').forEach(btn=>btn.addEventListener('click',()=>{
+    const name=btn.dataset.name;
+    navigateTo('chat');
+    document.getElementById('chat-agent-select').value=name;
+    toast('Agent selected: '+name+'. Type a message.','info');
+  }));
+}
+
+document.getElementById('refresh-agents')?.addEventListener('click',loadAgents);
+
+// ---------------------------------------------------------------------------
+// Compare
+// ---------------------------------------------------------------------------
+async function loadCompareModels(){
+  const res=await API.get('/api/providers');
+  if(!res?.ok)return;
+  const list=document.getElementById('compare-models-list');
+  list.innerHTML='';
+  State.compareSelected.clear();
+  res.providers.forEach(p=>{
+    (p.models||[]).forEach(m=>{
+      const id=p.name+'/'+m;
+      const card=document.createElement('div');
+      card.className='agent-card';
+      card.innerHTML=`
+        <div class="flex items-center justify-between">
+          <div>
+            <div style="font-weight:600">${esc(m)}</div>
+            <div class="text-sm text-muted">${esc(p.name)}</div>
+          </div>
+          <label class="flex items-center gap-8 text-sm">
+            <input type="checkbox" class="compare-cb" data-id="${esc(id)}" data-model="${esc(m)}" data-provider="${esc(p.name)}">
+            Select
+          </label>
+        </div>`;
+      list.appendChild(card);
+    });
+  });
+  list.querySelectorAll('.compare-cb').forEach(cb=>cb.addEventListener('change',()=>{
+    if(cb.checked)State.compareSelected.add(cb.dataset.id);
+    else State.compareSelected.delete(cb.dataset.id);
+  }));
+}
+
+document.getElementById('compare-run')?.addEventListener('click',async()=>{
+  const msg=document.getElementById('compare-input').value.trim();
+  if(!msg){toast('Enter a prompt','error');return;}
+  if(State.compareSelected.size===0){toast('Select at least one model','error');return;}
+  const models=[];
+  document.querySelectorAll('.compare-cb:checked').forEach(cb=>{
+    models.push({model:cb.dataset.model,provider:cb.dataset.provider});
+  });
+  const resultsDiv=document.getElementById('compare-results');
+  resultsDiv.innerHTML='<div class="empty-state">Running comparisons...</div>';
+  const res=await API.post('/api/compare',{message:msg,models});
+  if(!res?.ok){resultsDiv.innerHTML='<div class="empty-state">Error: '+esc(res?.error||'')+'</div>';return;}
+  resultsDiv.innerHTML='';
+  Object.entries(res.results).forEach(([key,r])=>{
+    const card=document.createElement('div');
+    card.className='card';
+    card.innerHTML=`
+      <div class="font-semibold mb-8">${esc(key)}</div>
+      <div class="text-sm text-muted mb-8">Tokens: ${r.tokens||0}</div>
+      <div style="white-space:pre-wrap">${esc(r.reply||r.error||'No response')}</div>`;
+    resultsDiv.appendChild(card);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Knowledge / RAG
+// ---------------------------------------------------------------------------
+document.getElementById('rag-ingest')?.addEventListener('click',async()=>{
+  const text=document.getElementById('rag-text').value.trim();
+  const source=document.getElementById('rag-source').value.trim()||'api';
+  if(!text){toast('Enter text','error');return;}
+  const res=await API.post('/api/rag/ingest',{text,source});
+  if(res?.ok){toast('Ingested','success');document.getElementById('rag-text').value='';}
+  else toast('Failed','error');
+});
+
+document.getElementById('rag-search')?.addEventListener('click',async()=>{
+  const query=document.getElementById('rag-query').value.trim();
+  if(!query){toast('Enter query','error');return;}
+  const res=await API.post('/api/rag/search',{query});
+  const div=document.getElementById('rag-results');
+  if(!res?.ok||!res.results?.length){div.innerHTML='<div class="empty-state">No results</div>';return;}
+  div.innerHTML='';
+  res.results.forEach(r=>{
+    const card=document.createElement('div');
+    card.className='card';
+    card.innerHTML=`<div class="text-sm text-muted">Source: ${esc(r.source||'unknown')}</div><div class="mt-8" style="white-space:pre-wrap">${esc(r.text)}</div>`;
+    div.appendChild(card);
+  });
+});
+
+document.getElementById('rag-clear')?.addEventListener('click',async()=>{
+  const res=await API.post('/api/rag/clear',{});
+  if(res?.ok)toast('Cleared','success');
+});
+
+// ---------------------------------------------------------------------------
+// Tools
+// ---------------------------------------------------------------------------
+async function loadTools(){
+  const res=await API.get('/api/tools');
+  if(!res?.ok)return;
+  const list=document.getElementById('tools-list');
+  list.innerHTML='';
+  if(!res.tools||!res.tools.length){list.innerHTML='<div class="empty-state"><div class="empty-state-icon">🧰</div>No tools discovered</div>';return;}
+  res.tools.forEach(t=>{
+    const card=document.createElement('div');
+    card.className='agent-card';
+    card.innerHTML=`
+      <div class="flex justify-between items-center">
+        <div>
+          <div style="font-weight:600">${esc(t.label)} <span class="text-xs text-dim">(${esc(t.name)})</span></div>
+          <div class="text-sm text-muted mt-8">${esc(t.description)}</div>
+          <div class="text-xs text-dim mt-8">${esc(t.transport)} • ${esc(t.endpoint)}</div>
+        </div>
+        <div class="flex flex-col gap-8 items-end">
+          <div class="toggle ${t.enabled?'on':''}" data-name="${esc(t.name)}"></div>
+          <button class="btn btn-sm run-tool-btn" data-name="${esc(t.name)}">Run</button>
+        </div>
+      </div>`;
     list.appendChild(card);
   });
-  document.querySelectorAll('.tool-enabled').forEach(cb=>cb.addEventListener('change', async (e)=>{
-    const name = e.target.dataset.name; const enabled = e.target.checked;
-    await API.post('/api/tools/enable', { name, enabled });
-    toast((enabled? 'Enabled ':'Disabled ') + name, 'info');
+  list.querySelectorAll('.toggle').forEach(tg=>tg.addEventListener('click',async()=>{
+    const name=tg.dataset.name;
+    const enabled=!tg.classList.contains('on');
+    await API.post('/api/tools/enable',{name,enabled});
+    tg.classList.toggle('on',enabled);
+    toast((enabled?'Enabled: ':'Disabled: ')+name,'info');
   }));
-  document.querySelectorAll('.run-tool-btn').forEach(btn=>btn.addEventListener('click', ()=>{
-    const name = btn.dataset.name; runTool(name);
-  }));
+  list.querySelectorAll('.run-tool-btn').forEach(btn=>btn.addEventListener('click',()=>runTool(btn.dataset.name)));
 }
 
 async function runTool(name){
-  const out = document.getElementById('tool-run-output');
-  out.style.display = 'block'; out.textContent = '';
+  const out=document.getElementById('tool-run-output');
+  out.classList.remove('hidden');
+  out.textContent='Running '+name+'...';
   try{
-    const res = await API.streamChat({}); // dummy to ensure headers? not needed
-  }catch{}
-  const evtSource = await fetch('/api/tools/run', {
-    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ name, input: {} })
-  });
-  if(!evtSource.ok){
-    const txt = await evtSource.text(); out.textContent = txt; return;
-  }
-  const reader = evtSource.body.getReader();
-  const decoder = new TextDecoder();
-  function read(){
-    reader.read().then(({done, value})=>{
-      if(done) return;
-      const chunk = decoder.decode(value);
-      // SSE parsing: lines like data: {..}\n\n
-      out.textContent += chunk.replace(/data: /g,'');
-      out.scrollTop = out.scrollHeight;
+    const res=await fetch('/api/tools/run',{method:'POST',headers:{...API._headers(),'Content-Type':'application/json'},body:JSON.stringify({name,input:{}})});
+    if(!res.ok){out.textContent=await res.text();return;}
+    const reader=res.body.getReader();
+    const decoder=new TextDecoder();
+    out.textContent='';
+    function read(){reader.read().then(({done,value})=>{
+      if(done)return;
+      out.textContent+=decoder.decode(value).replace(/data: /g,'').replace(/\[DONE\]/g,'');
+      out.scrollTop=out.scrollHeight;
       read();
-    });
+    });}
+    read();
+  }catch(e){out.textContent='[Error] '+e;}
+}
+
+document.getElementById('refresh-tools')?.addEventListener('click',loadTools);
+
+// ---------------------------------------------------------------------------
+// Plugins
+// ---------------------------------------------------------------------------
+async function loadPlugins(){
+  const res=await API.get('/api/plugins');
+  if(!res?.ok)return;
+  const list=document.getElementById('plugins-list');
+  list.innerHTML='';
+  res.plugins.forEach(p=>{
+    const card=document.createElement('div');
+    card.className='agent-card';
+    card.innerHTML=`
+      <div style="font-weight:600">${esc(p.name)}</div>
+      <div class="text-sm text-muted mt-8">${esc(p.description)}</div>`;
+    list.appendChild(card);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Admin
+// ---------------------------------------------------------------------------
+async function loadAdmin(){
+  const [statsRes,usageRes,provRes]=await Promise.all([
+    API.get('/api/admin/stats'),API.get('/api/admin/usage'),API.get('/api/providers')
+  ]);
+  if(statsRes?.ok){
+    const s=statsRes.stats;
+    document.getElementById('admin-stats').innerHTML=`
+      <table>
+        <tr><td>Total Requests</td><td>${s.requests_total||0}</td></tr>
+        <tr><td>Chat Requests</td><td>${s.chat_requests||0}</td></tr>
+        <tr><td>Total Tokens</td><td>${s.tokens_total||0}</td></tr>
+        <tr><td>Errors</td><td>${s.errors||0}</td></tr>
+        <tr><td>Started</td><td>${esc(s.started_at||'')}</td></tr>
+      </table>`;
   }
-  read();
+  if(usageRes?.ok){
+    const u=usageRes;
+    let html='<table><tr><th>Provider</th><th>Calls</th></tr>';
+    Object.entries(u.provider_usage||{}).forEach(([k,v])=>{html+=`<tr><td>${esc(k)}</td><td>${v}</td></tr>`});
+    html+='</table><div class="mt-12"></div><table><tr><th>Model</th><th>Calls</th></tr>';
+    Object.entries(u.model_usage||{}).forEach(([k,v])=>{html+=`<tr><td>${esc(k)}</td><td>${v}</td></tr>`});
+    html+='</table>';
+    document.getElementById('admin-usage').innerHTML=html;
+  }
+  if(provRes?.ok){
+    let html='<table><tr><th>Provider</th><th>Keys</th><th>Health</th><th>Enabled</th></tr>';
+    provRes.providers.forEach(p=>{
+      const health=p.health||[];
+      const healthy=health.filter(h=>h.healthy).length;
+      const total=health.length;
+      html+=`<tr><td>${esc(p.name)}</td><td>${total}</td><td>${healthy}/${total} healthy</td><td>${p.enabled?'<span class="badge badge-success">Yes</span>':'<span class="badge badge-error">No</span>'}</td></tr>`;
+    });
+    html+='</table>';
+    document.getElementById('admin-health').innerHTML=html;
+  }
 }
 
-document.getElementById('refresh-tools-btn').addEventListener('click', loadTools);
-
-// Integrate navigation
-const toolsNav = document.createElement('div');
-toolsNav.className = 'nav-item'; toolsNav.dataset.page = 'tools';
-toolsNav.innerHTML = '<span class="nav-icon">🧰</span> Tools';
-document.querySelector('#sidebar .sidebar-section + .nav-item').after(toolsNav);
-toolsNav.addEventListener('click', ()=> navigateTo('tools'));
-
-// load tools when Tools page opened
-function navigateTo(page){
-  // reuse existing navigateTo – override to add tools loading
-  State.currentPage = page;
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  const pageEl = document.getElementById(`page-${page}`);
-  if(pageEl) pageEl.classList.add('active');
-  document.querySelectorAll(`.nav-item[data-page="${page}"]`).forEach(n=>n.classList.add('active'));
-  if(page==='tools') loadTools();
+// ---------------------------------------------------------------------------
+// Settings
+// ---------------------------------------------------------------------------
+async function loadSettings(){
+  const res=await API.get('/api/providers');
+  if(!res?.ok)return;
+  const div=document.getElementById('settings-providers');
+  div.innerHTML='';
+  res.providers.forEach(p=>{
+    const row=document.createElement('div');
+    row.className='flex justify-between items-center mb-12';
+    row.innerHTML=`
+      <div>
+        <div style="font-weight:600">${esc(p.name)}</div>
+        <div class="text-xs text-dim">Priority: ${p.priority} • Keys: ${p.key_count} • Default: ${esc(p.default_model)}</div>
+      </div>
+      <div class="toggle ${p.enabled?'on':''}" data-provider="${esc(p.name)}"></div>`;
+    div.appendChild(row);
+  });
+  div.querySelectorAll('.toggle').forEach(tg=>tg.addEventListener('click',async()=>{
+    const name=tg.dataset.provider;
+    const enabled=!tg.classList.contains('on');
+    await API.post('/api/providers/toggle',{provider:name,enabled});
+    tg.classList.toggle('on',enabled);
+    toast((enabled?'Enabled: ':'Disabled: ')+name,'info');
+  }));
+  // API keys section
+  const keysDiv=document.getElementById('settings-keys');
+  keysDiv.innerHTML='';
+  res.providers.forEach(p=>{
+    const row=document.createElement('div');
+    row.className='mb-12';
+    row.innerHTML=`
+      <div class="text-sm font-semibold mb-8">${esc(p.name)}</div>
+      <div class="flex gap-8">
+        <input class="w-full" type="password" placeholder="Comma-separated API keys" data-provider="${esc(p.name)}">
+        <button class="btn btn-sm btn-primary save-keys-btn" data-provider="${esc(p.name)}">Save</button>
+      </div>`;
+    keysDiv.appendChild(row);
+  });
+  keysDiv.querySelectorAll('.save-keys-btn').forEach(btn=>btn.addEventListener('click',async()=>{
+    const name=btn.dataset.provider;
+    const input=keysDiv.querySelector(`input[data-provider="${name}"]`);
+    const keys=input.value.trim();
+    if(!keys){toast('Enter keys','error');return;}
+    const res=await API.post('/api/providers/keys',{provider:name,keys});
+    if(res?.ok){toast('Keys saved for '+name,'success');input.value='';}
+    else toast('Failed','error');
+  }));
 }
 
+document.getElementById('settings-apply')?.addEventListener('click',async()=>{
+  const provider=document.getElementById('settings-provider').value;
+  const model=document.getElementById('settings-model').value;
+  await API.post('/api/providers/switch',{provider});
+  await API.post('/api/models/switch',{model});
+  State.activeProvider=provider;
+  State.activeModel=model;
+  toast('Settings applied','success');
+});
+
+// ---------------------------------------------------------------------------
+// Right panel
+// ---------------------------------------------------------------------------
+document.querySelectorAll('.rp-tab').forEach(tab=>tab.addEventListener('click',()=>{
+  document.querySelectorAll('.rp-tab').forEach(t=>t.classList.remove('active'));
+  tab.classList.add('active');
+  State.rightPanelTab=tab.dataset.rptab;
+  loadRightPanel();
+}));
+
+async function loadRightPanel(){
+  const content=document.getElementById('rp-content');
+  if(State.rightPanelTab==='files'){
+    content.innerHTML='<div id="file-tree"></div>';
+    await loadFileTree('');
+  }else if(State.rightPanelTab==='terminal'){
+    content.innerHTML=`
+      <div class="flex flex-col" style="height:100%">
+        <div id="terminal-output" class="font-mono text-xs" style="flex:1;overflow:auto;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px;white-space:pre-wrap"></div>
+        <div class="flex gap-8 mt-8">
+          <input id="terminal-input" placeholder="$ command" class="w-full font-mono text-xs">
+          <button class="btn btn-sm btn-primary" id="terminal-run">Run</button>
+        </div>
+      </div>`;
+    const termInput=document.getElementById('terminal-input');
+    const termRun=document.getElementById('terminal-run');
+    const termOut=document.getElementById('terminal-output');
+    const runTerm=async()=>{
+      const cmd=termInput.value.trim();
+      if(!cmd)return;
+      termOut.textContent+='$ '+cmd+'\n';
+      termInput.value='';
+      try{
+        const res=await fetch('/api/terminal/exec',{method:'POST',headers:{...API._headers(),'Content-Type':'application/json'},body:JSON.stringify({command:cmd})});
+        const reader=res.body.getReader();
+        const decoder=new TextDecoder();
+        function read(){reader.read().then(({done,value})=>{
+          if(done)return;
+          const chunk=decoder.decode(value);
+          chunk.split('\n').forEach(line=>{
+            try{const j=JSON.parse(line);if(j.text)termOut.textContent+=j.text;if(j.exit_code!==undefined)termOut.textContent+='[exit: '+j.exit_code+']\n';}catch{}
+          });
+          termOut.scrollTop=termOut.scrollHeight;
+          read();
+        });}
+        read();
+      }catch(e){termOut.textContent+='[Error] '+e+'\n';}
+    };
+    termRun.addEventListener('click',runTerm);
+    termInput.addEventListener('keydown',e=>{if(e.key==='Enter')runTerm();});
+  }else if(State.rightPanelTab==='logs'){
+    content.innerHTML='<div id="logs-content" class="font-mono text-xs"></div>';
+    const res=await API.get('/api/logs');
+    const logsDiv=document.getElementById('logs-content');
+    if(res?.ok&&res.logs?.length){
+      logsDiv.innerHTML=res.logs.map(l=>`<div style="color:var(--text3)">[${l.level}] ${esc(l.msg)}</div>`).join('');
+    }else{
+      logsDiv.innerHTML='<div class="empty-state">No logs</div>';
+    }
+  }
+}
+
+async function loadFileTree(path){
+  const res=await API.get('/api/files/list?path='+encodeURIComponent(path));
+  const tree=document.getElementById('file-tree');
+  if(!res?.ok){tree.innerHTML='<div class="empty-state">No files</div>';return;}
+  let html=path?`<div class="file-tree-item" data-path="${path.split('/').slice(0,-1).join('/')}">📁 ..</div>`:'';
+  res.items.forEach(item=>{
+    const icon=item.type==='dir'?'📁':'📄';
+    const newPath=path?path+'/'+item.name:item.name;
+    html+=`<div class="file-tree-item" data-path="${esc(newPath)}" data-type="${item.type}">${icon} ${esc(item.name)}</div>`;
+  });
+  tree.innerHTML=html;
+  tree.querySelectorAll('.file-tree-item').forEach(el=>el.addEventListener('click',async()=>{
+    if(el.dataset.type==='dir'){
+      await loadFileTree(el.dataset.path);
+    }else{
+      const fileRes=await API.get('/api/files/read?path='+encodeURIComponent(el.dataset.path));
+      if(fileRes?.ok){
+        const modal=document.createElement('div');
+        modal.className='modal-overlay';
+        modal.innerHTML=`<div class="modal"><h2>${esc(el.dataset.path)}</h2><pre style="white-space:pre-wrap;font-size:12px;max-height:400px;overflow:auto">${esc(fileRes.content)}</pre><button class="btn mt-12" onclick="this.closest('.modal-overlay').remove()">Close</button></div>`;
+        document.getElementById('modal-root').appendChild(modal);
+      }
+    }
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Init
+// ---------------------------------------------------------------------------
+(async function init(){
+  await loadProviders();
+  await loadModels();
+  await loadAgents();
+  loadRightPanel();
+  // Health check
+  const health=await fetch('/health');
+  if(health.ok){console.log('System online');}
+})();
 </script>
-
 </body>
 </html>
