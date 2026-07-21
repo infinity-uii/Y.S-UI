@@ -18,6 +18,7 @@ import os
 import queue
 import secrets
 import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -45,6 +46,13 @@ from flask import (
     url_for,
 )
 from werkzeug.utils import secure_filename
+
+# Production: load .env if python-dotenv is available
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -118,18 +126,41 @@ logging.basicConfig(
 logging.getLogger().addHandler(_mem_handler)
 log = logging.getLogger("agent_system")
 
-# enable CORS if available
+# CORS: configurable via ALLOWED_ORIGINS env var (comma-separated). Default: allow all (dev).
+_ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "").strip()
+_cors_origins = [o.strip() for o in _ALLOWED_ORIGINS.split(",") if o.strip()] or ["*"]
+
 try:
     from flask_cors import CORS
 
     app = Flask(__name__, static_folder=None)
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    CORS(app, resources={r"/api/*": {"origins": _cors_origins}})
 except Exception:
     app = Flask(__name__, static_folder=None)
 
 app.secret_key = SECRET_KEY
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
 app.config["JSON_SORT_KEYS"] = False
+app.config["PROPAGATE_EXCEPTIONS"] = True
+
+# Rate limiting (production hardening)
+try:
+    from flask_limiter import Limiter
+    from flask_limiter.util import get_remote_address
+
+    _rate_storage = os.environ.get("RATELIMIT_STORAGE_URL", "memory://")
+    limiter = Limiter(
+        app=app,
+        key_func=get_remote_address,
+        default_limits=["200 per minute"],
+        storage_uri=_rate_storage,
+    )
+except Exception:
+    limiter = None
+    log.warning("flask-limiter not available; rate limiting disabled")
+
+# API versioning prefix
+API_PREFIX = os.environ.get("API_PREFIX", "/api")
 
 # register tools blueprint safely (lazy)
 try:
@@ -1199,6 +1230,21 @@ def index():
     return send_from_directory(str(Path(__file__).parent), "index.html")
 
 
+@app.route("/manifest.json")
+def manifest():
+    return send_from_directory(str(Path(__file__).parent / "public"), "manifest.json")
+
+
+@app.route("/sw.js")
+def service_worker():
+    return send_from_directory(str(Path(__file__).parent / "public"), "sw.js")
+
+
+@app.route("/icon-<int:size>.png")
+def icon(size):
+    return send_from_directory(str(Path(__file__).parent / "public"), f"icon-{size}.png")
+
+
 @app.route("/health")
 def health():
     return jsonify({"ok": True, "service": "agent_system", "time": datetime.now(timezone.utc).isoformat()})
@@ -1760,10 +1806,54 @@ def _init_db():
 
 
 # ---------------------------------------------------------------------------
+# Graceful shutdown
+# ---------------------------------------------------------------------------
+_shutdown_event = threading.Event()
+
+
+def _handle_shutdown(signum, frame):
+    sig_name = signal.Signals(signum).name
+    log.info("Received %s — initiating graceful shutdown...", sig_name)
+    _shutdown_event.set()
+    # Give in-flight requests a moment, then exit
+    threading.Timer(2.0, lambda: os._exit(0)).start()
+
+
+signal.signal(signal.SIGTERM, _handle_shutdown)
+signal.signal(signal.SIGINT, _handle_shutdown)
+
+
+# ---------------------------------------------------------------------------
+# Global error handler
+# ---------------------------------------------------------------------------
+@app.errorhandler(Exception)
+def handle_exception(e):
+    log.error("Unhandled exception: %s\n%s", e, traceback.format_exc())
+    track_request(error=True)
+    return jsonify({"ok": False, "error": "Internal server error", "detail": str(e)}), 500
+
+
+@app.errorhandler(404)
+def handle_404(e):
+    return jsonify({"ok": False, "error": "Not found"}), 404
+
+
+@app.errorhandler(405)
+def handle_405(e):
+    return jsonify({"ok": False, "error": "Method not allowed"}), 405
+
+
+@app.errorhandler(429)
+def handle_429(e):
+    return jsonify({"ok": False, "error": "Rate limit exceeded. Please slow down."}), 429
+
+
+# ---------------------------------------------------------------------------
 # Main entry
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     _init_db()
     _start_telegram_bot()
-    log.info("Starting Agent System on %s:%s (provider=%s, model=%s)", HOST, PORT, get_active_provider(), get_active_model())
+    log.info("Starting Agent System on %s:%s (provider=%s, model=%s, cors=%s, rate_limit=%s)",
+             HOST, PORT, get_active_provider(), get_active_model(), _cors_origins, bool(limiter))
     app.run(host=HOST, port=PORT, threaded=True)

@@ -1,0 +1,23 @@
+{
+  "appId": "com.ys.agent",
+  "appName": "Y.S Agent System",
+  "webDir": "android/www",
+  "server": {
+    "androidScheme": "https",
+    "url": "",
+    "cleartext": false
+  },
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false,
+    "backgroundColor": "#0a0e14"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "backgroundColor": "#0a0e14",
+      "showSpinner": false
+    }
+  }
+}

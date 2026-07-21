@@ -1,0 +1,22 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "Dockerfile"
+  },
+  "deploy": {
+    "startCommand": "gunicorn agent_system:app --bind 0.0.0.0:${PORT:-8080} --workers ${WEB_CONCURRENCY:-2} --timeout 120 --graceful-timeout 30 --access-logfile - --error-logfile -",
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 30,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3
+  },
+  "environments": {
+    "production": {
+      "env": {
+        "PYTHONUNBUFFERED": "1",
+        "WEB_CONCURRENCY": "2"
+      }
+    }
+  }
+}

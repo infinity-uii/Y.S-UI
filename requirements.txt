@@ -1,17 +1,29 @@
+# Web framework
+flask>=3.1.3
+flask-cors>=4.0.0
+flask-limiter>=3.5.0
+werkzeug>=3.1.8
+
+# HTTP client
+requests>=2.34.2
+httpx>=0.24.0
+
+# Production WSGI server
+gunicorn>=21.2.0
+
+# Database
+SQLAlchemy>=2.0
+psycopg2-binary>=2.9.0
+alembic>=1.11.1
+
+# Utilities
+python-dotenv>=1.0.0
+python-multipart>=0.0.6
+python-json-logger>=2.0
+tenacity>=8.2.2
+typing_extensions>=4.7.1
+
+# FastAPI gateway (main.py — optional secondary entry point)
 fastapi>=0.95.0
 uvicorn[standard]>=0.20.0
-litellm>=0.1.0,<1.0.0
-httpx>=0.24.0
-python-dotenv>=1.0.0
-tenacity>=8.2.2
-gunicorn>=21.0
-flask-cors>=4.0.0
-python-json-logger>=2.0
-crewai>=0.1.0
-crewai-tools>=0.1.0
 pydantic>=1.10.7
-alembic>=1.11.1
-psycopg2-binary>=2.9.0
-aiofiles>=23.1.0
-python-multipart>=0.0.6
-typing_extensions>=4.7.1
