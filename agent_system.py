@@ -62,7 +62,12 @@ PORT = int(os.environ.get("PORT", "8080"))
 # YS_USER / YS_PASSWORD are intentionally NOT cached at module load time.
 # They are read from os.environ on every request so that secrets set after
 # process start (e.g. via Replit Secrets) are picked up without a restart.
-SECRET_KEY = os.environ.get("SECRET_KEY", secrets.token_hex(32))
+# Accept either SECRET_KEY or SESSION_SECRET (Replit-standard name)
+SECRET_KEY = (
+    os.environ.get("SESSION_SECRET")
+    or os.environ.get("SECRET_KEY")
+    or secrets.token_hex(32)
+)
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 
 # Provider env keys
@@ -142,6 +147,16 @@ app.secret_key = SECRET_KEY
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
 app.config["JSON_SORT_KEYS"] = False
 app.config["PROPAGATE_EXCEPTIONS"] = True
+
+# ---------------------------------------------------------------------------
+# Register Gateway Blueprint (Secure AI API Gateway)
+# ---------------------------------------------------------------------------
+try:
+    from gateway import gateway_bp
+    app.register_blueprint(gateway_bp)
+    log.info("Gateway blueprint registered at /api/gateway")
+except Exception as _gw_err:
+    log.warning("Gateway blueprint not loaded: %s", _gw_err)
 
 # Rate limiting (production hardening)
 try:
