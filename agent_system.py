@@ -1255,6 +1255,14 @@ def service_worker():
     return send_from_directory(str(Path(__file__).parent / "public"), "sw.js")
 
 
+@app.route("/favicon.ico")
+def favicon():
+    try:
+        return send_from_directory(str(Path(__file__).parent / "public"), "icon-192.png", mimetype="image/png")
+    except Exception:
+        return "", 204
+
+
 @app.route("/icon-<int:size>.png")
 def icon(size):
     return send_from_directory(str(Path(__file__).parent / "public"), f"icon-{size}.png")
@@ -1263,6 +1271,19 @@ def icon(size):
 @app.route("/health")
 def health():
     return jsonify({"ok": True, "service": "agent_system", "time": datetime.now(timezone.utc).isoformat()})
+
+
+@app.route("/api/auth/status")
+def api_auth_status():
+    """Check authentication status — used by frontend on init."""
+    if session.get("user"):
+        return jsonify({"ok": True, "authenticated": True, "user": session["user"], "role": session.get("role", "user")})
+    api_key = request.headers.get("X-API-Key") or request.args.get("api_key", "")
+    if api_key:
+        keyd = validate_api_key(api_key)
+        if keyd:
+            return jsonify({"ok": True, "authenticated": True, "user": "api-key-user", "role": keyd.get("role", "user")})
+    return jsonify({"ok": False, "authenticated": False}), 401
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -1326,6 +1347,9 @@ def api_providers_keys():
     keys = _parse_keys(data.get("keys", ""))
     if name and keys:
         pm._pools[name] = KeyPool(keys, name)
+        # Auto-enable the provider when keys are provided
+        if name in pm._providers:
+            pm.set_enabled(name, True)
         return jsonify({"ok": True, "provider": name, "key_count": len(keys)})
     return jsonify({"ok": False, "error": "provider and keys required"}), 400
 

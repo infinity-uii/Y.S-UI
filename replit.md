@@ -119,11 +119,17 @@ The in-memory RAG backend is reset on restart. For persistence, implement `RAGBa
 - **PGVector**: `PGVECTOR_URL` (PostgreSQL with pgvector extension)
 - **Milvus**: `MILVUS_HOST` + `MILVUS_PORT`
 
+## Architecture enhancements (completed)
+
+- **Gateway module** (`gateway/`): Unified AI adapter pattern, request validation middleware, secure key injection, audit logging
+- **Login overlay**: Full session-based auth UI added to `index.html` — auto-detects 401, shows login form
+- **`/api/auth/status`**: Frontend uses this to check session state without a destructive 401
+- **Telegram bot** (`telegram_bot.py`): Full Arabic inline keyboard UI with all platform features
+- **Workflow**: Port-kill prefix in run command prevents "address in use" errors
+
 ## User preferences
 
-- Default provider: Ollama
-- Default model: llama3.2
-- Default endpoint: http://localhost:11434/v1/chat/completions
-- Preserve existing project architecture
+- Preserve existing project architecture — no restructuring
 - No placeholder code, no TODO comments
+- Default providers: Groq (priority 100) → Gemini (priority 90) → OpenAI/Anthropic (50) → Ollama (10)
 - Commit and push changes automatically via GITHUB_TOKEN

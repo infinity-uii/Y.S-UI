@@ -171,6 +171,21 @@ tr:hover td{background:var(--bg3)}
 .hidden{display:none!important}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .grid-3{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.font-semibold{font-weight:600}
+
+/* Login overlay */
+#login-overlay{position:fixed;inset:0;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;z-index:9998;backdrop-filter:blur(6px)}
+#login-overlay.hidden{display:none!important}
+.login-box{background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:40px;width:380px;max-width:92vw;box-shadow:0 24px 64px rgba(0,0,0,.7);animation:fadeIn .25s}
+.login-logo{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:32px}
+.login-logo-mark{width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,var(--primary),var(--accent));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;color:var(--bg)}
+.login-title{font-size:22px;font-weight:700;letter-spacing:-.5px}
+.login-subtitle{font-size:12px;color:var(--text3);margin-top:2px}
+.login-field{margin-bottom:16px}
+.login-field label{display:block;font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+.login-field input{width:100%;padding:11px 14px;font-size:14px}
+.login-error{color:var(--error);font-size:13px;margin-bottom:12px;min-height:18px;text-align:center;transition:all .2s}
+.login-btn{width:100%;padding:12px;font-size:15px;font-weight:600;border-radius:8px;margin-top:6px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -196,6 +211,10 @@ tr:hover td{background:var(--bg3)}
         <span class="badge badge-success"><span class="pulse">●</span> Online</span>
       </div>
       <div class="mt-8" id="active-provider-display"></div>
+      <div class="mt-8 flex gap-8 items-center">
+        <span id="sidebar-user" class="text-dim" style="font-size:11px"></span>
+        <button class="btn btn-sm btn-danger" id="logout-btn" style="padding:3px 8px;font-size:11px">Sign Out</button>
+      </div>
     </div>
   </div>
 
@@ -330,10 +349,25 @@ tr:hover td{background:var(--bg3)}
           <div class="font-semibold mb-12">Provider Management</div>
           <div id="settings-providers"></div>
         </div>
-        <div class="card">
+        <div class="card mb-12">
           <div class="font-semibold mb-12">API Keys</div>
           <div class="text-sm text-muted mb-12">Add multiple keys per provider (comma-separated) for rotation and failover.</div>
           <div id="settings-keys"></div>
+        </div>
+        <div class="card">
+          <div class="font-semibold mb-12">Session & Authentication</div>
+          <div class="mb-12">
+            <div class="text-sm text-muted mb-8">Master API Key — stored in your browser for programmatic/API access. Leave blank to use session login only.</div>
+            <div class="flex gap-8">
+              <input type="password" id="settings-master-key" class="w-full" placeholder="Paste master API key (optional)">
+              <button class="btn btn-sm btn-primary" id="save-master-key-btn">Save</button>
+              <button class="btn btn-sm btn-danger" id="clear-master-key-btn">Clear</button>
+            </div>
+          </div>
+          <div class="flex gap-8 items-center">
+            <span id="session-user-info" class="text-sm text-muted"></span>
+            <button class="btn btn-sm btn-danger" id="settings-logout-btn">Sign Out</button>
+          </div>
         </div>
       </div>
     </div>
@@ -963,17 +997,135 @@ async function loadFileTree(path){
 }
 
 // ---------------------------------------------------------------------------
+// Auth / Login
+// ---------------------------------------------------------------------------
+let _authenticated=false;
+
+function showLoginOverlay(){
+  document.getElementById('login-overlay').classList.remove('hidden');
+  setTimeout(()=>{const u=document.getElementById('login-username');if(u)u.focus();},120);
+}
+function hideLoginOverlay(){
+  document.getElementById('login-overlay').classList.add('hidden');
+  _authenticated=true;
+}
+
+async function checkAuth(){
+  try{
+    const r=await fetch('/api/auth/status',{credentials:'include',headers:API._headers()});
+    if(r.status===401){showLoginOverlay();return false;}
+    const d=await r.json();
+    if(!d?.ok||!d.authenticated){showLoginOverlay();return false;}
+    _authenticated=true;
+    const su=document.getElementById('sidebar-user');
+    const si=document.getElementById('session-user-info');
+    if(su)su.textContent=d.user||'';
+    if(si)si.textContent='Logged in as: '+(d.user||'');
+    return true;
+  }catch{showLoginOverlay();return false;}
+}
+
+async function doLogin(){
+  const username=document.getElementById('login-username').value.trim();
+  const password=document.getElementById('login-password').value;
+  const errEl=document.getElementById('login-error');
+  if(!username||!password){errEl.textContent='Please enter username and password';return;}
+  errEl.textContent='';
+  const btn=document.getElementById('login-submit');
+  btn.textContent='Signing in…';btn.disabled=true;
+  try{
+    const r=await fetch('/login',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
+    const d=await r.json();
+    if(d.ok){
+      hideLoginOverlay();
+      const su=document.getElementById('sidebar-user');
+      const si=document.getElementById('session-user-info');
+      if(su)su.textContent=username;
+      if(si)si.textContent='Logged in as: '+username;
+      toast('Welcome, '+username+'!','success');
+      await initApp();
+    }else{
+      errEl.textContent=d.error||'Invalid credentials';
+      document.getElementById('login-password').value='';
+    }
+  }catch(e){errEl.textContent='Connection error — try again.';}
+  finally{btn.textContent='Sign In';btn.disabled=false;}
+}
+
+async function doLogout(){
+  await fetch('/logout',{method:'POST',credentials:'include',headers:API._headers()});
+  _authenticated=false;
+  State.providers=[];State.models=[];State.agents={};
+  localStorage.removeItem('api_key');
+  const pSel=document.getElementById('provider-select');
+  const mSel=document.getElementById('model-select');
+  if(pSel)pSel.innerHTML='';if(mSel)mSel.innerHTML='';
+  document.getElementById('active-provider-display').textContent='';
+  showLoginOverlay();
+  toast('Signed out','info');
+}
+
+document.getElementById('login-submit')?.addEventListener('click',doLogin);
+document.getElementById('login-password')?.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+document.getElementById('login-username')?.addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('login-password').focus();});
+document.getElementById('logout-btn')?.addEventListener('click',doLogout);
+document.getElementById('settings-logout-btn')?.addEventListener('click',doLogout);
+
+// Master API Key management
+document.getElementById('save-master-key-btn')?.addEventListener('click',()=>{
+  const v=document.getElementById('settings-master-key').value.trim();
+  if(!v){toast('Enter a key first','error');return;}
+  localStorage.setItem('api_key',v);
+  document.getElementById('settings-master-key').value='';
+  toast('Master API key saved to browser','success');
+});
+document.getElementById('clear-master-key-btn')?.addEventListener('click',()=>{
+  localStorage.removeItem('api_key');
+  document.getElementById('settings-master-key').value='';
+  toast('API key cleared','info');
+});
+
+// ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
-(async function init(){
+async function initApp(){
   await loadProviders();
   await loadModels();
   await loadAgents();
   loadRightPanel();
-  // Health check
+}
+
+(async function init(){
   const health=await fetch('/health');
   if(health.ok){console.log('System online');}
+  const authed=await checkAuth();
+  if(authed)await initApp();
 })();
 </script>
+
+<!-- Login overlay -->
+<div id="login-overlay" class="hidden">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="login-logo-mark">YS</div>
+      <div>
+        <div class="login-title">Y.S Agent System</div>
+        <div class="login-subtitle">Enterprise AI Platform</div>
+      </div>
+    </div>
+    <form id="login-form" autocomplete="on" onsubmit="event.preventDefault();doLogin();">
+      <div class="login-field">
+        <label for="login-username">Username</label>
+        <input type="text" id="login-username" name="username" placeholder="Enter username" autocomplete="username" spellcheck="false">
+      </div>
+      <div class="login-field">
+        <label for="login-password">Password</label>
+        <input type="password" id="login-password" name="password" placeholder="Enter password" autocomplete="current-password">
+      </div>
+      <div class="login-error" id="login-error"></div>
+      <button type="submit" class="btn btn-primary login-btn" id="login-submit">Sign In</button>
+    </form>
+  </div>
+</div>
 </body>
 </html>

@@ -40,8 +40,9 @@ def init_db_engine(echo: bool = False):
         AsyncSessionLocal = sessionmaker(bind=_async_engine, class_=None, expire_on_commit=False)
         log.info("Initialized async DB engine")
     else:
-        # Sync engine
-        _sync_engine = create_engine(DATABASE_URL, echo=echo, pool_pre_ping=True)
+        # Sync engine — add check_same_thread=False for SQLite
+        connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+        _sync_engine = create_engine(DATABASE_URL, echo=echo, pool_pre_ping=True, connect_args=connect_args)
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_sync_engine)
         log.info("Initialized sync DB engine")
 
